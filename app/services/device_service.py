@@ -4,7 +4,8 @@ from typing import Optional
 
 import structlog
 
-from app.models.device import Device, DeviceCreate, DeviceResponse
+from app.config import settings
+from app.models.device import DeviceCreate, DeviceResponse
 from app.repositories.device_repository import DeviceRepository
 from app.services.mikrotik_service import MikrotikService
 
@@ -16,44 +17,44 @@ class DeviceService:
         self._repository = repository
 
     async def create_device(self, device_data: DeviceCreate) -> DeviceResponse:
+        username = device_data.username or settings.mikrotik_username
         logger.info(
-            'Creating new device',
+            "Creating new device",
             ip_address=device_data.ip_address,
             port=device_data.port,
-            username=device_data.username,
         )
 
+        device = None
         try:
-            device = await self._repository.create(
-                ip_address=device_data.ip_address,
-                username=device_data.username,
-                port=device_data.port,
-            )
             logger.info(
-                'Device created in repository',
-                device_id=device.id,
-                ip_address=device.ip_address,
-            )
-
-            logger.info(
-                'Fetching data from Mikrotik device',
-                device_id=device.id,
+                "Fetching data from Mikrotik device before creating",
                 ip_address=device_data.ip_address,
             )
 
             async with MikrotikService() as mikrotik:
                 mikrotik_data = await mikrotik.get_all_data(
                     ip_address=device_data.ip_address,
-                    username=device_data.username,
-                    password=device_data.password,
+                    username=device_data.username if device_data.username else None,
+                    password=device_data.password if device_data.password else None,
                     port=device_data.port,
                 )
 
             logger.info(
-                'Updating device with Mikrotik data',
+                "Successfully connected to Mikrotik device, creating device in repository",
+                ip_address=device_data.ip_address,
+                has_system_info="system" in mikrotik_data and bool(mikrotik_data["system"]),
+                interfaces_count=len(mikrotik_data.get("interfaces", [])),
+            )
+
+            device = await self._repository.create(
+                ip_address=device_data.ip_address,
+                username=username,
+                port=device_data.port,
+            )
+            logger.info(
+                "Device created in repository",
                 device_id=device.id,
-                has_system_info='system' in mikrotik_data and bool(mikrotik_data['system']),
-                interfaces_count=len(mikrotik_data.get('interfaces', [])),
+                ip_address=device.ip_address,
             )
 
             await self._repository.update_data(device.id, mikrotik_data)
@@ -61,13 +62,13 @@ class DeviceService:
             updated_device = await self._repository.get_by_id(device.id)
             if not updated_device:
                 logger.error(
-                    'Failed to retrieve created device',
+                    "Failed to retrieve created device",
                     device_id=device.id,
                 )
-                raise RuntimeError('Failed to retrieve created device')
+                raise RuntimeError("Failed to retrieve created device")
 
             logger.info(
-                'Device successfully created and configured',
+                "Device successfully created and configured",
                 device_id=updated_device.id,
                 ip_address=updated_device.ip_address,
             )
@@ -81,8 +82,16 @@ class DeviceService:
                 data=updated_device.data,
             )
         except Exception as e:
+            if device:
+                logger.warning(
+                    "Removing device from repository due to error",
+                    device_id=device.id,
+                    ip_address=device_data.ip_address,
+                )
+                await self._repository.delete(device.id)
+
             logger.error(
-                'Failed to create device',
+                "Failed to create device",
                 ip_address=device_data.ip_address,
                 port=device_data.port,
                 error=str(e),
@@ -122,8 +131,8 @@ class DeviceService:
     async def refresh_device_data(
         self,
         device_id: str,
-        username: str,
-        password: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
     ) -> Optional[DeviceResponse]:
         device = await self._repository.get_by_id(device_id)
         if not device:
@@ -154,4 +163,3 @@ class DeviceService:
 
     async def delete_device(self, device_id: str) -> bool:
         return await self._repository.delete(device_id)
-
