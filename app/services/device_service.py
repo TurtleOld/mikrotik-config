@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from typing import Optional
 
+import structlog
+
 from app.models.device import Device, DeviceCreate, DeviceResponse
 from app.repositories.device_repository import DeviceRepository
 from app.services.mikrotik_service import MikrotikService
+
+logger = structlog.get_logger(__name__)
 
 
 class DeviceService:
@@ -12,34 +16,80 @@ class DeviceService:
         self._repository = repository
 
     async def create_device(self, device_data: DeviceCreate) -> DeviceResponse:
-        device = await self._repository.create(
+        logger.info(
+            'Creating new device',
             ip_address=device_data.ip_address,
-            username=device_data.username,
             port=device_data.port,
+            username=device_data.username,
         )
 
-        async with MikrotikService() as mikrotik:
-            mikrotik_data = await mikrotik.get_all_data(
+        try:
+            device = await self._repository.create(
                 ip_address=device_data.ip_address,
                 username=device_data.username,
-                password=device_data.password,
                 port=device_data.port,
             )
+            logger.info(
+                'Device created in repository',
+                device_id=device.id,
+                ip_address=device.ip_address,
+            )
 
-        await self._repository.update_data(device.id, mikrotik_data)
+            logger.info(
+                'Fetching data from Mikrotik device',
+                device_id=device.id,
+                ip_address=device_data.ip_address,
+            )
 
-        updated_device = await self._repository.get_by_id(device.id)
-        if not updated_device:
-            raise RuntimeError('Failed to retrieve created device')
+            async with MikrotikService() as mikrotik:
+                mikrotik_data = await mikrotik.get_all_data(
+                    ip_address=device_data.ip_address,
+                    username=device_data.username,
+                    password=device_data.password,
+                    port=device_data.port,
+                )
 
-        return DeviceResponse(
-            id=updated_device.id,
-            ip_address=updated_device.ip_address,
-            port=updated_device.port,
-            created_at=updated_device.created_at,
-            last_accessed=updated_device.last_accessed,
-            data=updated_device.data,
-        )
+            logger.info(
+                'Updating device with Mikrotik data',
+                device_id=device.id,
+                has_system_info='system' in mikrotik_data and bool(mikrotik_data['system']),
+                interfaces_count=len(mikrotik_data.get('interfaces', [])),
+            )
+
+            await self._repository.update_data(device.id, mikrotik_data)
+
+            updated_device = await self._repository.get_by_id(device.id)
+            if not updated_device:
+                logger.error(
+                    'Failed to retrieve created device',
+                    device_id=device.id,
+                )
+                raise RuntimeError('Failed to retrieve created device')
+
+            logger.info(
+                'Device successfully created and configured',
+                device_id=updated_device.id,
+                ip_address=updated_device.ip_address,
+            )
+
+            return DeviceResponse(
+                id=updated_device.id,
+                ip_address=updated_device.ip_address,
+                port=updated_device.port,
+                created_at=updated_device.created_at,
+                last_accessed=updated_device.last_accessed,
+                data=updated_device.data,
+            )
+        except Exception as e:
+            logger.error(
+                'Failed to create device',
+                ip_address=device_data.ip_address,
+                port=device_data.port,
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
+            raise
 
     async def get_device(self, device_id: str) -> Optional[DeviceResponse]:
         device = await self._repository.get_by_id(device_id)

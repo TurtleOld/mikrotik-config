@@ -10,6 +10,9 @@ from litestar.contrib.jinja import JinjaTemplateEngine
 
 from app.api.controllers import device_controller, health_controller
 from app.config import settings
+from app.logging_config import configure_logging
+
+configure_logging()
 
 
 template_config = TemplateConfig(

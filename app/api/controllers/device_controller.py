@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
+import structlog
 from litestar import Controller, get, post, delete
 from litestar.response import Template
 from litestar.di import Provide
@@ -10,6 +11,8 @@ from litestar.params import Dependency
 from app.models.device import DeviceCreate, DeviceResponse
 from app.repositories.device_repository import DeviceRepository
 from app.services.device_service import DeviceService
+
+logger = structlog.get_logger(__name__)
 
 
 def get_device_service() -> DeviceService:
@@ -40,18 +43,39 @@ class DeviceController(Controller):
         data: DeviceCreate,
         service: Annotated[DeviceService, Dependency(skip_validation=True)],
     ) -> Template:
+        logger.info(
+            'Received request to create device',
+            ip_address=data.ip_address,
+            port=data.port,
+            username=data.username,
+        )
+
         try:
             device = await service.create_device(data)
+            logger.info(
+                'Device created successfully',
+                device_id=device.id,
+                ip_address=device.ip_address,
+            )
             devices = await service.get_all_devices()
             return Template(
                 template_name='device_list.html',
                 context={'devices': devices, 'message': 'Устройство успешно добавлено'},
             )
         except Exception as e:
+            logger.error(
+                'Failed to create device in controller',
+                ip_address=data.ip_address,
+                port=data.port,
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
             devices = await service.get_all_devices()
+            error_message = str(e)
             return Template(
                 template_name='device_list.html',
-                context={'devices': devices, 'error': str(e)},
+                context={'devices': devices, 'error': error_message},
             )
 
     @get('/devices', tags=['devices'])
