@@ -34,6 +34,27 @@ uv run litestar run --reload --app app.main:app
 docker-compose up --build
 ```
 
+### GitHub Container Registry
+
+Образ автоматически собирается и публикуется в GitHub Container Registry при каждом push в main ветку.
+
+Использование образа из registry:
+
+```bash
+docker pull ghcr.io/turtleold/mikrotik-config:latest
+docker run -p 8000:8000 ghcr.io/turtleold/mikrotik-config:latest
+```
+
+Или с docker-compose:
+
+```yaml
+services:
+  web:
+    image: ghcr.io/turtleold/mikrotik-config:latest
+    ports:
+      - '8000:8000'
+```
+
 ## Usage
 
 1. Open http://localhost:8000
@@ -44,3 +65,14 @@ docker-compose up --build
 
 Set environment variables:
 - `APP_ENV`: Application environment (development/production)
+
+## GitHub Actions
+
+Проект включает GitHub Actions workflow для автоматической сборки Docker образа и публикации в GitHub Container Registry (ghcr.io).
+
+Workflow запускается автоматически при:
+- Push в ветку `main`
+- Создании тега версии (например, `v1.0.0`)
+- Pull Request в ветку `main`
+
+Образы доступны по адресу: `ghcr.io/turtleold/mikrotik-config`
