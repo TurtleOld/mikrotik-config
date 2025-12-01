@@ -8,8 +8,8 @@ from pydantic import BaseModel, Field, field_validator
 
 class DeviceCreate(BaseModel):
     ip_address: str = Field(..., description='IP address of Mikrotik device')
-    username: str = Field(default='admin', description='Username for authentication')
-    password: str = Field(..., description='Password for authentication')
+    username: Optional[str] = Field(default=None, description='Username for authentication')
+    password: Optional[str] = Field(default=None, description='Password for authentication')
     port: int = Field(default=80, ge=1, le=65535, description='Port number')
 
     @field_validator('ip_address')
