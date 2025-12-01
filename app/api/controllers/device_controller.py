@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated
 
 import structlog
-from litestar import Controller, get, post, delete
+from litestar import Controller, Request, get, post, delete
 from litestar.response import Template
 from litestar.di import Provide
 from litestar.params import Dependency
@@ -40,9 +40,26 @@ class DeviceController(Controller):
     @post('/devices', tags=['devices'])
     async def create_device(
         self,
-        data: DeviceCreate,
+        request: Request,
         service: Annotated[DeviceService, Dependency(skip_validation=True)],
     ) -> Template:
+        form_data = await request.form()
+        ip_address = form_data.get('ip_address', '').strip()
+        username_str = form_data.get('username', '').strip()
+        password_str = form_data.get('password', '').strip()
+        port_str = form_data.get('port', '80').strip()
+        
+        username = username_str if username_str else None
+        password = password_str if password_str else None
+        port = int(port_str) if port_str else 80
+
+        data = DeviceCreate(
+            ip_address=ip_address,
+            username=username,
+            password=password,
+            port=port,
+        )
+
         logger.info(
             'Received request to create device',
             ip_address=data.ip_address,
