@@ -16,35 +16,35 @@
 
     {% if device.data %}
     <div class="data-section">
-        {% if device.data.system %}
-        <h3>Системная информация</h3>
-        {% if device.data.system is mapping %}
-        {% for key, value in device.data.system.items() %}
-        <div class="data-item">
-            <span class="data-key">{{ key }}:</span>
-            <span class="data-value">{{ value }}</span>
+        {% if device.data.identity %}
+        <h3>Идентификация устройства</h3>
+        <div class="device-card" style="margin-bottom: 20px;">
+            {% for key, value in device.data.identity.items() %}
+            <div class="data-item">
+                <span class="data-key">{{ key }}:</span>
+                <span class="data-value">{{ value }}</span>
+            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
-        {% else %}
-        {% for item in device.data.system %}
-        {% if item is mapping %}
-        {% for key, value in item.items() %}
-        <div class="data-item">
-            <span class="data-key">{{ key }}:</span>
-            <span class="data-value">{{ value }}</span>
-        </div>
-        {% endfor %}
-        {% endif %}
-        {% endfor %}
-        {% endif %}
         {% endif %}
 
-        {% if device.data.interfaces %}
-        <h3 style="margin-top: 30px;">Интерфейсы</h3>
-        {% for interface in device.data.interfaces %}
-        <div class="device-card" style="margin-bottom: 15px;">
-            {% if interface is mapping %}
-            {% for key, value in interface.items() %}
+        {% if device.data.routerboard %}
+        <h3>Информация о RouterBoard</h3>
+        <div class="device-card" style="margin-bottom: 20px;">
+            {% for key, value in device.data.routerboard.items() %}
+            <div class="data-item">
+                <span class="data-key">{{ key }}:</span>
+                <span class="data-value">{{ value }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if device.data.system %}
+        <h3>Системная информация</h3>
+        <div class="device-card" style="margin-bottom: 20px;">
+            {% if device.data.system is mapping %}
+            {% for key, value in device.data.system.items() %}
             <div class="data-item">
                 <span class="data-key">{{ key }}:</span>
                 <span class="data-value">{{ value }}</span>
@@ -52,7 +52,137 @@
             {% endfor %}
             {% endif %}
         </div>
+        {% endif %}
+
+        {% if device.data.clock %}
+        <h3>Время и дата</h3>
+        <div class="device-card" style="margin-bottom: 20px;">
+            {% for key, value in device.data.clock.items() %}
+            <div class="data-item">
+                <span class="data-key">{{ key }}:</span>
+                <span class="data-value">{{ value }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if device.data.license %}
+        <h3>Лицензия</h3>
+        <div class="device-card" style="margin-bottom: 20px;">
+            {% for key, value in device.data.license.items() %}
+            <div class="data-item">
+                <span class="data-key">{{ key }}:</span>
+                <span class="data-value">{{ value }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if device.data.interfaces %}
+        <h3 style="margin-top: 30px;">Интерфейсы ({{ device.data.interfaces|length }})</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; margin-top: 20px;">
+        {% set bridges = [] %}
+        {% set vlans = [] %}
+        {% set other_interfaces = [] %}
+        {% for interface in device.data.interfaces %}
+            {% if interface.type == 'bridge' %}
+                {% set _ = bridges.append(interface) %}
+            {% elif interface.type == 'vlan' %}
+                {% set _ = vlans.append(interface) %}
+            {% else %}
+                {% set _ = other_interfaces.append(interface) %}
+            {% endif %}
         {% endfor %}
+        
+        {% for bridge in bridges %}
+        <div class="device-card" style="margin-bottom: 0; transition: transform 0.2s, box-shadow 0.2s;" 
+             onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'"
+             onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'">
+            <div style="font-weight: 600; margin-bottom: 10px; color: #667eea;">
+                {{ bridge.name if bridge.name else 'Без имени' }}
+            </div>
+            <div class="data-item">
+                <span class="data-key">MAC-адрес:</span>
+                <span class="data-value">{{ bridge['mac-address'] if bridge.get('mac-address') else 'N/A' }}</span>
+            </div>
+            <div class="data-item">
+                <span class="data-key">Статус:</span>
+                <span class="data-value" style="color: {% if bridge.running == 'true' or bridge.running == true %}green{% else %}red{% endif %};">
+                    {{ 'Работает' if (bridge.running == 'true' or bridge.running == true) else 'Остановлен' }}
+                </span>
+            </div>
+            <div class="data-item">
+                <span class="data-key">Тип:</span>
+                <span class="data-value">{{ bridge.type if bridge.type else 'N/A' }}</span>
+            </div>
+            {% set bridge_vlans = [] %}
+            {% for vlan in vlans %}
+                {% set vlan_interface = vlan.get('interface', '') %}
+                {% set bridge_name_lower = (bridge.name|lower if bridge.name else '') %}
+                {% set vlan_name_lower = (vlan.name|lower if vlan.name else '') %}
+                {% set matched = false %}
+                {% if vlan_interface == bridge.name %}
+                    {% set matched = true %}
+                {% elif bridge_name_lower and vlan_name_lower %}
+                    {% set bridge_clean = bridge_name_lower|replace('bridge', '')|replace('vlan', '')|trim %}
+                    {% set vlan_clean = vlan_name_lower|replace('vlan', '')|trim %}
+                    {% if bridge_clean == vlan_clean and bridge_clean != '' %}
+                        {% set matched = true %}
+                    {% elif 'wifi' in bridge_name_lower and 'wifi' in vlan_name_lower %}
+                        {% set matched = true %}
+                    {% endif %}
+                {% endif %}
+                {% if matched %}
+                    {% set _ = bridge_vlans.append(vlan) %}
+                {% endif %}
+            {% endfor %}
+            {% if bridge_vlans %}
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;">
+                <div style="font-weight: 500; margin-bottom: 10px; color: #666; font-size: 0.9rem;">VLAN:</div>
+                {% for vlan in bridge_vlans %}
+                <a href="#" style="display: block; padding: 8px 12px; margin-bottom: 5px; background: white; border-radius: 6px; text-decoration: none; color: #667eea; border-left: 3px solid #667eea; transition: background 0.2s;"
+                   onmouseover="this.style.background='#f0f4ff'"
+                   onmouseout="this.style.background='white'">
+                    <div style="font-weight: 500;">{{ vlan.name if vlan.name else 'Без имени' }}</div>
+                    <div style="font-size: 0.85rem; color: #999; margin-top: 2px;">
+                        MAC: {{ vlan.get('mac-address', 'N/A') }} | 
+                        Статус: <span style="color: {% if vlan.running == 'true' or vlan.running == true %}green{% else %}red{% endif %};">
+                            {{ 'Работает' if (vlan.running == 'true' or vlan.running == true) else 'Остановлен' }}
+                        </span>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+        
+        {% for interface in other_interfaces %}
+        <a href="#" style="text-decoration: none; color: inherit;">
+            <div class="device-card" style="margin-bottom: 0; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" 
+                 onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'"
+                 onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'">
+                <div style="font-weight: 600; margin-bottom: 10px; color: #667eea;">
+                    {{ interface.name if interface.name else 'Без имени' }}
+                </div>
+                <div class="data-item">
+                    <span class="data-key">MAC-адрес:</span>
+                    <span class="data-value">{{ interface['mac-address'] if interface.get('mac-address') else 'N/A' }}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-key">Статус:</span>
+                    <span class="data-value" style="color: {% if interface.running == 'true' or interface.running == true %}green{% else %}red{% endif %};">
+                        {{ 'Работает' if (interface.running == 'true' or interface.running == true) else 'Остановлен' }}
+                    </span>
+                </div>
+                <div class="data-item">
+                    <span class="data-key">Тип:</span>
+                    <span class="data-value">{{ interface.type if interface.type else 'N/A' }}</span>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+        </div>
         {% endif %}
     </div>
     {% else %}

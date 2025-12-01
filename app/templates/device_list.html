@@ -11,8 +11,17 @@
 <div class="device-card">
     <div class="device-header">
         <div>
-            <strong>{{ device.ip_address }}:{{ device.port }}</strong>
+            <strong>
+                {% if device.data and device.data.identity and device.data.identity.name %}
+                    {{ device.data.identity.name }}
+                {% else %}
+                    {{ device.ip_address }}:{{ device.port }}
+                {% endif %}
+            </strong>
             <div class="device-info">
+                {% if device.data and device.data.identity and device.data.identity.name %}
+                    IP: {{ device.ip_address }}:{{ device.port }}<br>
+                {% endif %}
                 ID: {{ device.id }}<br>
                 Добавлено: {{ device.created_at.strftime('%d.%m.%Y %H:%M:%S') }}
                 {% if device.last_accessed %}
@@ -41,14 +50,34 @@
     {% if device.data %}
     <div class="data-section">
         <h3>Данные устройства</h3>
+        {% if device.data.identity %}
+        <div class="data-item">
+            <span class="data-key">Имя:</span>
+            <span class="data-value">{{ device.data.identity.name if device.data.identity.name else 'Не задано' }}</span>
+        </div>
+        {% endif %}
+        {% if device.data.routerboard %}
+        <div class="data-item">
+            <span class="data-key">Модель:</span>
+            <span class="data-value">
+                {% if device.data.routerboard.model %}
+                    {{ device.data.routerboard.model }}
+                {% elif device.data.routerboard.board-name %}
+                    {{ device.data.routerboard.board-name }}
+                {% else %}
+                    Неизвестно
+                {% endif %}
+            </span>
+        </div>
+        {% endif %}
         {% if device.data.system %}
         <div class="data-item">
-            <span class="data-key">Система:</span>
+            <span class="data-key">Версия RouterOS:</span>
             <span class="data-value">
-                {% if device.data.system is mapping %}
-                Данные загружены
+                {% if device.data.system.version %}
+                    {{ device.data.system.version }}
                 {% else %}
-                {{ device.data.system|length }} записей
+                    Неизвестно
                 {% endif %}
             </span>
         </div>
