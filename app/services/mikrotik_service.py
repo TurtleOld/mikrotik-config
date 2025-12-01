@@ -29,20 +29,76 @@ class MikrotikService:
         encoded = base64.b64encode(credentials.encode()).decode()
         return f'Basic {encoded}'
 
+    async def _fetch_endpoint(
+        self,
+        ip_address: str,
+        endpoint: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        port: int = 80,
+    ) -> Any:
+        if not self._client:
+            logger.error('MikrotikService not initialized', service='mikrotik')
+            raise RuntimeError('Service not initialized. Use async context manager.')
+
+        auth_username = username or settings.mikrotik_username
+        auth_password = password or settings.mikrotik_password
+
+        url = f'http://{ip_address}:{port}/rest/{endpoint}'
+        headers = {
+            'Authorization': self._get_auth_header(auth_username, auth_password),
+            'Content-Type': 'application/json',
+        }
+
+        try:
+            response = await self._client.get(url, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            if isinstance(data, list) and len(data) > 0:
+                return data[0] if isinstance(data[0], dict) else data
+            return data if isinstance(data, dict) else {}
+        except httpx.HTTPStatusError as e:
+            logger.warning(
+                'Mikrotik API HTTP error',
+                ip_address=ip_address,
+                endpoint=endpoint,
+                status_code=e.response.status_code,
+            )
+            return {}
+        except httpx.RequestError as e:
+            logger.warning(
+                'Failed to fetch endpoint',
+                ip_address=ip_address,
+                endpoint=endpoint,
+                error=str(e),
+            )
+            return {}
+        except Exception as e:
+            logger.warning(
+                'Unexpected error while fetching endpoint',
+                ip_address=ip_address,
+                endpoint=endpoint,
+                error=str(e),
+            )
+            return {}
+
     async def get_system_info(
         self,
         ip_address: str,
-        username: str,
-        password: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
         port: int = 80,
     ) -> dict[str, Any]:
         if not self._client:
             logger.error('MikrotikService not initialized', service='mikrotik')
             raise RuntimeError('Service not initialized. Use async context manager.')
 
+        auth_username = username or settings.mikrotik_username
+        auth_password = password or settings.mikrotik_password
+
         url = f'http://{ip_address}:{port}/rest/system/resource'
         headers = {
-            'Authorization': self._get_auth_header(username, password),
+            'Authorization': self._get_auth_header(auth_username, auth_password),
             'Content-Type': 'application/json',
         }
 
@@ -99,17 +155,20 @@ class MikrotikService:
     async def get_interfaces(
         self,
         ip_address: str,
-        username: str,
-        password: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
         port: int = 80,
     ) -> list[dict[str, Any]]:
         if not self._client:
             logger.error('MikrotikService not initialized', service='mikrotik')
             raise RuntimeError('Service not initialized. Use async context manager.')
 
+        auth_username = username or settings.mikrotik_username
+        auth_password = password or settings.mikrotik_password
+
         url = f'http://{ip_address}:{port}/rest/interface'
         headers = {
-            'Authorization': self._get_auth_header(username, password),
+            'Authorization': self._get_auth_header(auth_username, auth_password),
             'Content-Type': 'application/json',
         }
 
@@ -161,11 +220,47 @@ class MikrotikService:
             )
             raise
 
+    async def get_identity(
+        self,
+        ip_address: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        port: int = 80,
+    ) -> dict[str, Any]:
+        return await self._fetch_endpoint(ip_address, 'system/identity', username, password, port)
+
+    async def get_routerboard(
+        self,
+        ip_address: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        port: int = 80,
+    ) -> dict[str, Any]:
+        return await self._fetch_endpoint(ip_address, 'system/routerboard', username, password, port)
+
+    async def get_clock(
+        self,
+        ip_address: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        port: int = 80,
+    ) -> dict[str, Any]:
+        return await self._fetch_endpoint(ip_address, 'system/clock', username, password, port)
+
+    async def get_license(
+        self,
+        ip_address: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        port: int = 80,
+    ) -> dict[str, Any]:
+        return await self._fetch_endpoint(ip_address, 'system/license', username, password, port)
+
     async def get_all_data(
         self,
         ip_address: str,
-        username: str,
-        password: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
         port: int = 80,
     ) -> dict[str, Any]:
         logger.info(
@@ -176,6 +271,10 @@ class MikrotikService:
         try:
             system_info = await self.get_system_info(ip_address, username, password, port)
             interfaces = await self.get_interfaces(ip_address, username, password, port)
+            identity = await self.get_identity(ip_address, username, password, port)
+            routerboard = await self.get_routerboard(ip_address, username, password, port)
+            clock = await self.get_clock(ip_address, username, password, port)
+            license_info = await self.get_license(ip_address, username, password, port)
 
             logger.info(
                 'Successfully fetched all data from Mikrotik',
@@ -183,11 +282,17 @@ class MikrotikService:
                 port=port,
                 has_system_info=bool(system_info),
                 interfaces_count=len(interfaces),
+                has_identity=bool(identity),
+                has_routerboard=bool(routerboard),
             )
 
             return {
                 'system': system_info,
                 'interfaces': interfaces,
+                'identity': identity,
+                'routerboard': routerboard,
+                'clock': clock,
+                'license': license_info,
             }
         except Exception as e:
             logger.error(
