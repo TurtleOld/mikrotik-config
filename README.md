@@ -30,8 +30,14 @@ uv run litestar run --reload --app app.main:app
 
 ### Docker
 
+**Development:**
 ```bash
 docker-compose up --build
+```
+
+**Production:**
+```bash
+docker-compose -f docker-compose.prod.yml up -d
 ```
 
 ### GitHub Container Registry
