@@ -1,0 +1,65 @@
+{% if error %}
+<div class="message message-error">{{ error }}</div>
+{% else %}
+<div class="device-card" style="margin-top: 20px;">
+    <h2>Детали устройства: {{ device.ip_address }}:{{ device.port }}</h2>
+    
+    <div class="device-info" style="margin-top: 15px;">
+        <strong>ID:</strong> {{ device.id }}<br>
+        <strong>IP адрес:</strong> {{ device.ip_address }}<br>
+        <strong>Порт:</strong> {{ device.port }}<br>
+        <strong>Создано:</strong> {{ device.created_at.strftime('%d.%m.%Y %H:%M:%S') }}<br>
+        {% if device.last_accessed %}
+        <strong>Последний доступ:</strong> {{ device.last_accessed.strftime('%d.%m.%Y %H:%M:%S') }}<br>
+        {% endif %}
+    </div>
+
+    {% if device.data %}
+    <div class="data-section">
+        {% if device.data.system %}
+        <h3>Системная информация</h3>
+        {% if device.data.system is mapping %}
+        {% for key, value in device.data.system.items() %}
+        <div class="data-item">
+            <span class="data-key">{{ key }}:</span>
+            <span class="data-value">{{ value }}</span>
+        </div>
+        {% endfor %}
+        {% else %}
+        {% for item in device.data.system %}
+        {% if item is mapping %}
+        {% for key, value in item.items() %}
+        <div class="data-item">
+            <span class="data-key">{{ key }}:</span>
+            <span class="data-value">{{ value }}</span>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endfor %}
+        {% endif %}
+        {% endif %}
+
+        {% if device.data.interfaces %}
+        <h3 style="margin-top: 30px;">Интерфейсы</h3>
+        {% for interface in device.data.interfaces %}
+        <div class="device-card" style="margin-bottom: 15px;">
+            {% if interface is mapping %}
+            {% for key, value in interface.items() %}
+            <div class="data-item">
+                <span class="data-key">{{ key }}:</span>
+                <span class="data-value">{{ value }}</span>
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+    {% else %}
+    <div style="padding: 20px; text-align: center; color: #666;">
+        Данные устройства не загружены
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+

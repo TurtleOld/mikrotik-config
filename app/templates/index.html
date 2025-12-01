@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Mikrotik Device Manager</h1>
+
+<div x-data="{ showForm: false }">
+    <button @click="showForm = !showForm" class="btn-secondary">
+        <span x-show="!showForm">Добавить устройство</span>
+        <span x-show="showForm">Скрыть форму</span>
+    </button>
+
+    <div x-show="showForm" x-transition style="margin-top: 20px;">
+        <form 
+            hx-post="/devices" 
+            hx-target="#device-list" 
+            hx-swap="outerHTML" 
+            hx-indicator="#loading"
+            hx-on::after-request="if(event.detail.successful) { showForm = false; this.reset(); }">
+            <div class="form-group">
+                <label for="ip_address">IP адрес устройства:</label>
+                <input type="text" id="ip_address" name="ip_address" required placeholder="192.168.1.1">
+            </div>
+            <div class="form-group">
+                <label for="username">Имя пользователя:</label>
+                <input type="text" id="username" name="username" value="admin" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Пароль:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <div class="form-group">
+                <label for="port">Порт:</label>
+                <input type="number" id="port" name="port" value="80" min="1" max="65535" required>
+            </div>
+            <button type="submit">Добавить устройство</button>
+            <span id="loading" class="htmx-indicator" style="margin-left: 10px;">Загрузка...</span>
+        </form>
+    </div>
+</div>
+
+<div id="device-list" hx-get="/devices" hx-trigger="load">
+    {% include "device_list.html" %}
+</div>
+{% endblock %}
+

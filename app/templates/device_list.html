@@ -1,0 +1,73 @@
+{% if message %}
+<div class="message message-success">{{ message }}</div>
+{% endif %}
+{% if error %}
+<div class="message message-error">{{ error }}</div>
+{% endif %}
+
+{% if devices %}
+<h2 style="margin-top: 30px; margin-bottom: 20px;">Устройства ({{ devices|length }})</h2>
+{% for device in devices %}
+<div class="device-card">
+    <div class="device-header">
+        <div>
+            <strong>{{ device.ip_address }}:{{ device.port }}</strong>
+            <div class="device-info">
+                ID: {{ device.id }}<br>
+                Добавлено: {{ device.created_at.strftime('%d.%m.%Y %H:%M:%S') }}
+                {% if device.last_accessed %}
+                <br>Последний доступ: {{ device.last_accessed.strftime('%d.%m.%Y %H:%M:%S') }}
+                {% endif %}
+            </div>
+        </div>
+        <div class="device-actions">
+            <button 
+                hx-get="/devices/{{ device.id }}" 
+                hx-target="#device-detail" 
+                hx-swap="innerHTML"
+                class="btn-secondary">
+                Просмотр
+            </button>
+            <button 
+                hx-delete="/devices/{{ device.id }}" 
+                hx-target="#device-list" 
+                hx-swap="outerHTML"
+                hx-confirm="Вы уверены, что хотите удалить это устройство?"
+                class="btn-danger">
+                Удалить
+            </button>
+        </div>
+    </div>
+    {% if device.data %}
+    <div class="data-section">
+        <h3>Данные устройства</h3>
+        {% if device.data.system %}
+        <div class="data-item">
+            <span class="data-key">Система:</span>
+            <span class="data-value">
+                {% if device.data.system is mapping %}
+                Данные загружены
+                {% else %}
+                {{ device.data.system|length }} записей
+                {% endif %}
+            </span>
+        </div>
+        {% endif %}
+        {% if device.data.interfaces %}
+        <div class="data-item">
+            <span class="data-key">Интерфейсы:</span>
+            <span class="data-value">{{ device.data.interfaces|length }} записей</span>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div style="text-align: center; padding: 40px; color: #666;">
+    <p>Устройства не добавлены. Добавьте первое устройство, используя форму выше.</p>
+</div>
+{% endif %}
+
+<div id="device-detail"></div>
+
